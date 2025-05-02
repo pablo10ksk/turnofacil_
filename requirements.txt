@@ -1,0 +1,9 @@
+flask
+requests
+json
+datetime
+urllib3
+streamlit
+openai
+pytz
+python-dotenv
