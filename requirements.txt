@@ -1,9 +1,10 @@
 flask
 requests
-json
 datetime
 urllib3
 streamlit
 openai
 pytz
 python-dotenv
+twilio
+elasticsearch>=8.0.0,<9.0.0

@@ -20,6 +20,8 @@ class Contestation:
         routing_data: dict,
         availability: list,
         message_: str,
+        future_events: list = None,
+        past_events: list = None,
         location_map_pretty={
             "online": "online",
             "SLM": "Salamanca",
@@ -27,6 +29,12 @@ class Contestation:
             "BJ": "Béjar",
         },
     ):
+        future_events = future_events or []
+        past_events = past_events or []
+        eventos_futuros_text = json.dumps(future_events, ensure_ascii=False, indent=2)
+        eventos_pasados_text = json.dumps(past_events, ensure_ascii=False, indent=2)
+
+
         """
         Genera una respuesta basada en la conversacion y los datos del router.
         """
@@ -50,10 +58,13 @@ class Contestation:
                         - fecha y hora EXACTOS.
                 7. ❗ Si el lugar no está claro o no es un sitio concreto, ofrece 3 opciones más cercanas.
                 8. ❌ Nunca respondas en inglés.
+                
 
                 Datos disponibles:
                 - Disponibilidad: {availability}
                 - Datos del usuario (extraídos por el router):
+                - EVENTOS FUTUROS del usuario (reservas pendientes):\n{eventos_futuros_text}
+                - EVENTOS PASADOS del usuario (histórico de reservas):\n{eventos_pasados_text}
                 {json.dumps(routing_data, indent=2)}
                 """
             ),

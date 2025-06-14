@@ -1,17 +1,18 @@
 import streamlit as st
 import os
-import json
 import requests
 from router import Router
 from answer import Contestation
-from backend import location_code_map, availability_map, get_options_from_router
+from backend import location_code_map, get_options_from_router
 from dotenv import load_dotenv
+from db_object import DbObject_Elasticsearch
+import pytz
+from datetime import datetime
 
 load_dotenv()
 api_key = os.getenv("api_key")
 
 
-# 🟡 BACKEND FLASK como intermediario
 def save_message_to_backend(phone, in_msg="", out_msg=""):
     payload = {
         "phone": phone,
@@ -44,6 +45,30 @@ def main():
             {"role": "assistant", "content": welcome}
         )
 
+    # Siempre consulta reservas pasadas y futuras en cada turno
+    db = DbObject_Elasticsearch()
+    now = datetime.now(pytz.timezone("Europe/Madrid"))
+    now_str = now.strftime("%Y-%m-%dT%H:%M:%S")
+    future_events = db.get_future_events(user_phone, now_str)
+    past_events = db.get_past_events(user_phone, now_str)
+
+    # Si quieres informar al usuario (solo como ejemplo, puedes quitar esto si no lo quieres)
+    if future_events:
+        reserva = future_events[0]
+        mensaje = (
+            f"NOTA: Tienes una reserva pendiente:\n"
+            f"- Fecha y hora: {reserva.get('date','')}\n"
+            f"- Lugar: {reserva.get('location','')}\n"
+        )
+        # Solo muestra el mensaje una vez (no repetir cada turno)
+        if mensaje not in [m["content"] for m in st.session_state["messages"]]:
+            st.session_state["messages"].append(
+                {"role": "assistant", "content": mensaje}
+            )
+            st.session_state["conversation_history"].append(
+                {"role": "assistant", "content": mensaje}
+            )
+
     for msg in st.session_state["messages"]:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -58,25 +83,34 @@ def main():
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        routing_response = st.session_state.router.route(
+        routing_response = st.session_state["router"].route(
             st.session_state["conversation_history"],
             list(location_code_map.keys()),
-            user_input,  # Añadido
+            user_input,
+            future_events=future_events,
+            past_events=past_events,
         )
 
-        if routing_response["purpose"] == "close":
-            routing_response["phone"] = user_phone
-            res = requests.post(
-                "http://localhost:5555/record_apponintment", json=routing_response
-            )
+        # Si la intención es cerrar la cita, registra la reserva (como antes)
+        if routing_response.get("purpose") == "close":
+            payload = {
+                "phone": user_phone,
+                "location": routing_response.get("where"),
+                "date": routing_response.get("when"),
+            }
+            requests.post(
+                "http://localhost:5555/record_appointment", json=payload
+            )  # TODO: Change port
 
-        final_text = st.session_state.contestation.get_response(
+        final_text = st.session_state["contestation"].get_response(
             st.session_state["conversation_history"],
             routing_response,
             get_options_from_router(routing_response),
-            user_input,  # Añadido
+            user_input,
+            future_events=future_events,
+            past_events=past_events,
         )
-        # Enviamos entrada + salida en la misma llamada al backend Flask
+
         save_message_to_backend(phone=user_phone, in_msg=user_input, out_msg=final_text)
 
         with st.chat_message("assistant"):

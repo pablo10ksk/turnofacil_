@@ -87,14 +87,16 @@ class eazybase:
 
 class dbdata:
     def __init__(self):
-        """Initialize Elasticsearch connection and index name."""
         self.endpoint = ELASTIC_ENDPOINT
         self.key = ELASTICAPI_KEY
         self.es = Elasticsearch(self.endpoint, api_key=self.key)
         self.index_name = "te_reservation"
 
     def insert_record(self, phone_: str, date_: str, location_: str) -> Dict:
-        """Insert a log entry into Elasticsearch."""
         doc = {"phone_": phone_, "date_res": date_, "location_": location_}
-        result = self.es.index(index=self.index_name, body=doc)
-        return result
+        try:
+            result = self.es.index(index=self.index_name, body=doc)
+            return result
+        except Exception as e:
+            print(f"❌ Error al insertar en Elasticsearch: {str(e)}")
+            return {"error": "No se pudo registrar la cita en Elasticsearch"}

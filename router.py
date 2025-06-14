@@ -3,6 +3,11 @@ import json
 from datetime import datetime, timedelta
 from datetime import datetime, timedelta
 import pytz
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
 
 
 # ================== 0. Configuración de fechas ==================
@@ -21,7 +26,12 @@ class Router:
         self.client = OpenAI(api_key=api_key)
         self.model = model
 
-    def route(self, conversation_history, locations, current_msg):
+    def route(self, conversation_history, locations, current_msg, future_events=None, past_events=None):
+        future_events = future_events or []
+        past_events = past_events or []
+        eventos_futuros_text = json.dumps(future_events, ensure_ascii=False, indent=2)
+        eventos_pasados_text = json.dumps(past_events, ensure_ascii=False, indent=2)
+
         messages_for_router = (
             [
                 {
@@ -29,6 +39,9 @@ class Router:
                     "content": (
                         f"Tu tarea es extraer información en formato JSON sobre la cita que el usuario quiere reservar.\n"
                         f"La fecha actual es: {fecha_actual}. Interpreta expresiones como 'mañana', 'la semana que viene' o 'pasado mañana' teniendo en cuenta esta fecha.\n"
+                        f"\nEVENTOS FUTUROS del usuario (reservas pendientes):\n{eventos_futuros_text}\n"
+                        f"EVENTOS PASADOS del usuario (histórico de reservas):\n{eventos_pasados_text}\n"
+                        #"⚠️ Si el usuario ya tiene una reserva futura, NO permitas crear otra y pregunta si quiere cambiar o cancelar la actual..."
                         "⚠️ Si el usuario **NO indica explícitamente** que quiere una cita online o presencial, NO rellenes el campo 'how'.\n"
                         "⚠️ Solo incluye 'how' si el usuario usa palabras como 'online', 'en persona', 'presencial', etc. (sinónimos de ellas)\n"
                         "⚠️ Solo incluye 'where' si el usuario dice una localidad clara (CIUDAD o PUEBLO: como Salamanca, Bejar, etc.). Si no es concreta, sigue preguntando hasta dar con el lugar exacto\n"
